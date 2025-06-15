@@ -1,0 +1,22 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
+command: >-
+ ls ${{outputs.MODEL_INPUTS}} &&
+ python -m lerobot.scripts.train \
+    --policy.type=act \
+    --policy.device=cuda \
+    --output_dir=${{outputs.MODEL_OUTPUTS}}/goat_picking_v1 \
+    --job_name=act_so101_goat \
+    --dataset.repo_id=noraabk/so101-goat-picking-v1 \
+    --dataset.root=${{outputs.MODEL_INPUTS}}
+environment: azureml:lerobot-openpi0-env:1
+outputs:
+  MODEL_OUTPUTS:
+    type: uri_folder
+    path: azureml://datastores/nora_datasets/paths/outputs
+  MODEL_INPUTS:
+    type: uri_folder
+    path: azureml://datastores/nora_datasets/paths/inputs/so101-goat-picking-v1
+display_name: act_goat_picking_training
+experiment_name: act_goat_picking_training
+compute: nc80adis-h100-v5-single
+code: ..

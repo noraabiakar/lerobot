@@ -21,4 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY . /lerobot
 WORKDIR /lerobot
 RUN /opt/venv/bin/pip install --upgrade --no-cache-dir pip \
-    && /opt/venv/bin/pip install --no-cache-dir ".[test, aloha, xarm, pusht, dynamixel]"
+    && /opt/venv/bin/pip install --no-cache-dir ".[test, aloha, xarm, pusht, dynamixel]" \
+    && /opt/venv/bin/pip install transformers==4.48.0
+
+RUN apt-get update && apt-get install curl -y && curl -sL https://aka.ms/InstallAzureCLIDeb | bash 
