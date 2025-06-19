@@ -321,6 +321,9 @@ def update_keys_with_prefix(d: dict, prefix: str) -> dict:
 def convert_pi0_checkpoint(checkpoint_dir: str, precision: str, tokenizer_id: str, output_path: str):
     # Break down orbax ckpts - they are in OCDBT
     initial_params = slice_initial_orbax_checkpoint(checkpoint_dir=checkpoint_dir)
+
+    print(f"initial_params keys {initial_params['projection_params'].keys()}")
+
     # process projection params
     keys = [
         "state_proj",

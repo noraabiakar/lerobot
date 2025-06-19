@@ -174,8 +174,8 @@ def record_loop(
         raise ValueError(f"The dataset fps should be equal to requested fps ({dataset.fps} != {fps}).")
 
     # if policy is given it needs cleaning up
-    if policy is not None:
-        policy.reset()
+    # if policy is not None:
+    #     policy.reset()
 
     timestamp = 0
     start_episode_t = time.perf_counter()
@@ -191,16 +191,34 @@ def record_loop(
         if policy is not None or dataset is not None:
             observation_frame = build_dataset_frame(dataset.features, observation, prefix="observation")
 
+            print("observation_frame: ")
+            print(observation_frame.keys())
+
         if policy is not None:
-            action_values = predict_action(
-                observation_frame,
-                policy,
-                get_safe_torch_device(policy.config.device),
-                policy.config.use_amp,
-                task=single_task,
-                robot_type=robot.robot_type,
-            )
-            action = {key: action_values[i].item() for i, key in enumerate(robot.action_features)}
+            # action_values = predict_action(
+            #     observation_frame,
+            #     policy,
+            #     get_safe_torch_device(policy.config.device),
+            #     policy.config.use_amp,
+            #     task=single_task,
+            #     robot_type=robot.robot_type,
+            # )
+            renamings = {
+                "observation/image": "observation.images.front",
+                "observation/wrist_image": "observation.images.side",
+                "observation/state": "observation.state",
+                #"actions": "action",
+                "prompt": "prompt",
+            }
+
+            observation_frame["prompt"] = single_task
+
+            observation_frame = {k: observation_frame[v] for k,v in renamings.items()}
+            
+            action_values = policy.infer(observation_frame)["actions"]
+            print("HERE: ", action_values)
+            print("Actiopn_features ", robot.action_features)
+            action = {key: action_values[0][i] for i, key in enumerate(robot.action_features)}
         elif policy is None and teleop is not None:
             action = teleop.get_action()
         else:
@@ -215,10 +233,10 @@ def record_loop(
         # so action actually sent is saved in the dataset.
         sent_action = robot.send_action(action)
 
-        if dataset is not None:
-            action_frame = build_dataset_frame(dataset.features, sent_action, prefix="action")
-            frame = {**observation_frame, **action_frame}
-            dataset.add_frame(frame, task=single_task)
+        # if dataset is not None:
+        #     action_frame = build_dataset_frame(dataset.features, sent_action, prefix="action")
+        #     frame = {**observation_frame, **action_frame}
+        #     dataset.add_frame(frame, task=single_task)
 
         if display_data:
             for obs, val in observation.items():
@@ -277,7 +295,28 @@ def record(cfg: RecordConfig) -> LeRobotDataset:
         )
 
     # Load pretrained policy
-    policy = None if cfg.policy is None else make_policy(cfg.policy, ds_meta=dataset.meta)
+    # policy = None if cfg.policy is None else make_policy(cfg.policy, ds_meta=dataset.meta)
+
+    ###############
+    from openpi.policies import policy_config as _policy_config
+    from openpi.training import config as _config
+    from openpi.models import pi0_fast
+
+    custom_config = _config.TrainConfig(
+        name="pi0_fast_custom",
+        model=pi0_fast.Pi0FASTConfig(action_dim=7, action_horizon=10, max_token_len=180),
+        data=_config.LeRobotV2DataConfig(
+            repo_id="noraabk/so101-goat-picking-v1",
+            base_config=_config.DataConfig(prompt_from_task=True),
+        ),
+        #weight_loader=_weight_loaders.CheckpointWeightLoader("s3://openpi-assets/checkpoints/pi0_fast_base/params"),
+        #num_train_steps=30_000,
+    )
+    checkpoint_dir = "/storage/models/openpi0fast_50_episodes_PI_impl_jax"
+
+    # Create a trained policy.
+    policy = _policy_config.create_trained_policy(custom_config, checkpoint_dir)
+    ################
 
     robot.connect()
     if teleop is not None:
