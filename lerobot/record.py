@@ -177,6 +177,7 @@ def record_loop(
     # if policy is not None:
     #     policy.reset()
 
+    action_queue = []
     timestamp = 0
     start_episode_t = time.perf_counter()
     while timestamp < control_time_s:
@@ -191,8 +192,16 @@ def record_loop(
         if policy is not None or dataset is not None:
             observation_frame = build_dataset_frame(dataset.features, observation, prefix="observation")
 
-            print("observation_frame: ")
-            print(observation_frame.keys())
+            state = observation_frame["observation.state"]
+            state_dict = {
+                "shoulder_pan.pos": state[0],
+                "shoulder_lift.pos": state[1],
+                "elbow_flex.pos": state[2],
+                "wrist_flex.pos": state[3],
+                "wrist_roll.pos": state[4],
+                "gripper.pos": state[5],
+            }    
+            print("STATE:  ", state_dict)
 
         if policy is not None:
             # action_values = predict_action(
@@ -204,21 +213,29 @@ def record_loop(
             #     robot_type=robot.robot_type,
             # )
             renamings = {
-                "observation/image": "observation.images.front",
-                "observation/wrist_image": "observation.images.side",
+                "observation/image": "observation.images.side",
+                "observation/wrist_image": "observation.images.front",
                 "observation/state": "observation.state",
                 #"actions": "action",
                 "prompt": "prompt",
             }
 
             observation_frame["prompt"] = single_task
-
             observation_frame = {k: observation_frame[v] for k,v in renamings.items()}
+
+            # Only run inference if the queue is empty
+            if not action_queue:
+                action_values = policy.infer(observation_frame)["actions"]
+                # Assume action_values is a 2D array: (batch, action_dim)
+                # Fill the queue with all actions in the batch
+                for av in action_values:
+                    action_queue.append({key: av[i] for i, key in enumerate(robot.action_features)})
             
-            action_values = policy.infer(observation_frame)["actions"]
-            print("HERE: ", action_values)
-            print("Actiopn_features ", robot.action_features)
-            action = {key: action_values[0][i] for i, key in enumerate(robot.action_features)}
+            # Pop the next action from the queue
+            action = action_queue.pop(0)
+            round_action = {k: round(float(v), 8) for k, v in action.items()}
+            print("ACTION: ", round_action)
+            print()
         elif policy is None and teleop is not None:
             action = teleop.get_action()
         else:
@@ -251,7 +268,7 @@ def record_loop(
         dt_s = time.perf_counter() - start_loop_t
         busy_wait(1 / fps - dt_s)
 
-        timestamp = time.perf_counter() - start_episode_t
+        # timestamp = time.perf_counter() - start_episode_t
 
 
 @parser.wrap()
