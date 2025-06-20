@@ -1,14 +1,15 @@
 $schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
 command: >-
- az upgrade &&
- export HF_TOKEN=$(az keyvault secret show --vault-name nabk-kv-robotics --name HF_TOKEN --query value -o tsv) &&
  python -m lerobot.scripts.train \
     --policy.path=${{outputs.PI0FAST_CHECKPOINT}}\
     --policy.device=cuda \
     --output_dir=${{outputs.MODEL_OUTPUTS}}/goat_picking_pi0fast_v1 \
     --job_name=pi0fast_so101_goat \
     --dataset.repo_id=noraabk/so101-goat-picking-v1 \
-    --dataset.root=${{outputs.MODEL_INPUTS}}
+    --dataset.root=${{outputs.MODEL_INPUTS}} \
+    --batch_size=16 \
+    --steps 50000 \
+    --save_freq 5000
 environment: azureml:lerobot-openpi0-env:6
 outputs:
   MODEL_OUTPUTS:
@@ -24,3 +25,5 @@ display_name: pi0fast_goat_picking_finetuning
 experiment_name: pi0fast_goat_picking_finetuning
 compute: nc80adis-h100-v5-single
 code: ..
+environment_variables:
+  HF_TOKEN: ""
