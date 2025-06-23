@@ -146,8 +146,9 @@ class RecordConfig:
         policy_path = parser.get_path_arg("policy")
         if policy_path:
             cli_overrides = parser.get_cli_overrides("policy")
-            self.policy = PreTrainedConfig.from_pretrained(policy_path, cli_overrides=cli_overrides)
-            self.policy.pretrained_path = policy_path
+            #self.policy = PreTrainedConfig.from_pretrained(policy_path, cli_overrides=cli_overrides)
+            #self.policy.pretrained_path = policy_path
+            self.policy = "Hack"
 
         if self.teleop is None and self.policy is None:
             raise ValueError("Choose a policy, a teleoperator or both to control the robot")
@@ -317,19 +318,35 @@ def record(cfg: RecordConfig) -> LeRobotDataset:
     ###############
     from openpi.policies import policy_config as _policy_config
     from openpi.training import config as _config
-    from openpi.models import pi0_fast
 
+    # Pi0 FAST
+    from openpi.models import pi0_fast
     custom_config = _config.TrainConfig(
         name="pi0_fast_custom",
         model=pi0_fast.Pi0FASTConfig(action_dim=7, action_horizon=10, max_token_len=180),
         data=_config.LeRobotV2DataConfig(
-            repo_id="noraabk/so101-goat-picking-v1",
+            repo_id="noraabk/so101-goat-picking-v3",
             base_config=_config.DataConfig(prompt_from_task=True),
         ),
         #weight_loader=_weight_loaders.CheckpointWeightLoader("s3://openpi-assets/checkpoints/pi0_fast_base/params"),
         #num_train_steps=30_000,
     )
-    checkpoint_dir = "/storage/models/openpi0fast_50_episodes_PI_impl_jax"
+    #checkpoint_dir = "/storage/models/openpi0fast_50_episodes_PI_impl_jax"
+    checkpoint_dir = "/storage/models/openpi0fast_200_episodes_PI_impl"
+
+    # Pi0
+    # from openpi.models import pi0
+    # custom_config = _config.TrainConfig(
+    #     name="pi0_custom",
+    #     model=pi0.Pi0Config(action_dim=7, action_horizon=10, max_token_len=180),
+    #     data=_config.LeRobotV2DataConfig(
+    #         repo_id="noraabk/so101-goat-picking-v3",
+    #         base_config=_config.DataConfig(prompt_from_task=True),
+    #     ),
+    #     #weight_loader=_weight_loaders.CheckpointWeightLoader("s3://openpi-assets/checkpoints/pi0_fast_base/params"),
+    #     #num_train_steps=30_000,
+    # )
+    # checkpoint_dir = ""
 
     # Create a trained policy.
     policy = _policy_config.create_trained_policy(custom_config, checkpoint_dir)
